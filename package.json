@@ -1,0 +1,15 @@
+{
+  "name": "asanify-autoclock",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Automated weekday Asanify clock-in via headless Google-SSO login + token intercept",
+  "scripts": {
+    "capture": "node capture-session.mjs",
+    "clockin": "node clock-in.mjs",
+    "dry": "node clock-in.mjs --dry-run"
+  },
+  "dependencies": {
+    "playwright": "^1.49.1"
+  }
+}

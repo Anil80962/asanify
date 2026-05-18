@@ -1,0 +1,7 @@
+# Secrets / sessions — NEVER commit. These contain auth tokens & login cookies.
+captured/
+auth/
+*.har
+*.local
+.env
+node_modules/

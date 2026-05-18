@@ -1,0 +1,4 @@
+{
+  "_comment": "Roster only — NO secrets here. For each id below, the repo admin must add two GitHub Actions secrets: ASANIFY_STATE_<ID> and ASANIFY_EMPCODE_<ID> (id uppercased). ids must be A-Z/0-9/underscore. To add an employee: append their id here AND add their two secrets.",
+  "employees": ["anil"]
+}

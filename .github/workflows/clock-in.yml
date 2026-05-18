@@ -1,0 +1,88 @@
+name: Asanify clock-in (multi-employee)
+
+on:
+  schedule:
+    # GitHub cron is UTC. IST = UTC + 5:30. Convert your desired IST time:
+    #   09:00 IST -> "30 3 * * 1-5"
+    #   09:30 IST -> "0 4 * * 1-5"   <-- current default
+    #   10:00 IST -> "30 4 * * 1-5"
+    # 1-5 = Mon-Fri. NOTE: GitHub-hosted cron can lag 5-15 min under load.
+    - cron: "0 4 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (verify each login only, no clock-in)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: asanify-clock-in
+  cancel-in-progress: false
+
+jobs:
+  # Turn employees.json into a job matrix. Secret names are derived by
+  # convention: ASANIFY_STATE_<ID> / ASANIFY_EMPCODE_<ID> (id uppercased).
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gen
+        run: |
+          node -e '
+            const r = require("./employees.json");
+            const inc = (r.employees||[]).map(id => {
+              const U = String(id).toUpperCase();
+              return { id, stateSecret: "ASANIFY_STATE_"+U, empSecret: "ASANIFY_EMPCODE_"+U };
+            });
+            if (!inc.length) { console.error("employees.json has no employees"); process.exit(1); }
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT,
+              "matrix=" + JSON.stringify({ include: inc }) + "\n");
+          '
+
+  clock-in:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false # one employee failing must not skip the others
+      max-parallel: 1 # serialize logins — gentler on Google's bot heuristics
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: "Clock in: ${{ matrix.id }}"
+        env:
+          ASANIFY_STATE_B64: ${{ secrets[matrix.stateSecret] }}
+          ASANIFY_EMPCODE: ${{ secrets[matrix.empSecret] }}
+        run: |
+          if [ -z "$ASANIFY_STATE_B64" ]; then
+            echo "::error::Missing secret ${{ matrix.stateSecret }} for '${{ matrix.id }}'. Add it (see ONBOARDING.md)."
+            exit 1
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            node clock-in.mjs --dry-run
+          else
+            node clock-in.mjs
+          fi
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asanify-failure-${{ matrix.id }}
+          path: |
+            auth/failure-*.png
+            auth/failure-*.html
+          if-no-files-found: ignore
+          retention-days: 7
