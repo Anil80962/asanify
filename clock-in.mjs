@@ -52,9 +52,9 @@ try {
 
   // SSO may bounce through accounts.google.com and back. We don't drive it —
   // valid cookies make it silent. We just wait for the SPA to authenticate.
-  let token;
+  let token, authorization;
   try {
-    token = await tokenP;
+    ({ token, authorization } = await tokenP);
   } catch (e) {
     await dumpFailure("noauth");
     log(`❌ Never saw an authenticated API call: ${e.message}`);
@@ -65,7 +65,7 @@ try {
   }
   log(`Fresh token intercepted (${token.length} chars). Calling attendance API...`);
 
-  const res = await callAttendance(page, { token, empcode, dryRun: DRY_RUN });
+  const res = await callAttendance(page, { token, authorization, empcode, dryRun: DRY_RUN });
 
   if (res.status !== 200) {
     await dumpFailure("api");

@@ -47,8 +47,9 @@ export function resolveStatePath() {
   return p;
 }
 
-// Attaches a listener that resolves with the first fresh `refresh-token`
-// header the Asanify SPA sends to its API after login. Returns a promise.
+// Attaches a listener that resolves with the first fresh auth headers
+// the Asanify SPA sends to its API after login. Returns { token, authorization }.
+// The attendance API requires BOTH refresh-token AND Authorization: Bearer <access_token>.
 export function waitForFreshToken(context, timeoutMs = 90_000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -62,7 +63,7 @@ export function waitForFreshToken(context, timeoutMs = 90_000) {
         const tok = h["refresh-token"];
         if (tok && tok.length > 100) {
           clearTimeout(timer);
-          resolve(tok);
+          resolve({ token: tok, authorization: h["authorization"] || "" });
         }
       } catch {
         /* ignore */
@@ -103,45 +104,42 @@ export function getEmpcode() {
   throw new Error("ASANIFY_EMPCODE not set (env) and not found in captured/asanify-secrets.json");
 }
 
-// Performs the clock-in/status call from *inside the page*, so Origin and CORS
-// exactly match what the real SPA sends (highest fidelity).
-export async function callAttendance(page, { token, empcode, dryRun }) {
-  return page.evaluate(
-    async ({ api, token, empcode, dryRun }) => {
-      const headers = {
-        accept: "application/json, text/plain, */*",
-        "content-type": "application/json",
-        "refresh-token": token,
-      };
-      if (dryRun) {
-        const d = new Date();
-        const body = {
-          asan_empcode: empcode,
-          clock_date: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
-          clock_time: `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`,
-        };
-        const r = await fetch(api + "/api/attendance/status", {
-          method: "POST",
-          headers,
-          body: JSON.stringify(body),
-        });
-        return { status: r.status, text: await r.text(), kind: "status" };
-      }
-      const body = {
-        asan_empcode: empcode,
-        clock_type: "IN",
-        clock_time: "",
-        latitude: null,
-        longitude: null,
-        source: "WEB",
-      };
-      const r = await fetch(api + "/api/attendance/clock", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
-      return { status: r.status, text: await r.text(), kind: "clock" };
-    },
-    { api: ASANIFY_API, token, empcode, dryRun }
+// Performs the clock-in/status call using Playwright's context.request, which
+// uses the browser context's cookies and bypasses CORS — identical fidelity to
+// what the SPA sends, without the in-page fetch CORS block.
+export async function callAttendance(page, { token, authorization, empcode, dryRun }) {
+  const headers = {
+    accept: "application/json, text/plain, */*",
+    "content-type": "application/json",
+    "refresh-token": token,
+    origin: "https://secure.asanify.com",
+    referer: "https://secure.asanify.com/",
+  };
+  if (authorization) headers["authorization"] = authorization;
+  if (dryRun) {
+    const d = new Date();
+    const body = {
+      asan_empcode: empcode,
+      clock_date: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+      clock_time: `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`,
+    };
+    const r = await page.context().request.post(
+      ASANIFY_API + "/api/attendance/status",
+      { headers, data: body }
+    );
+    return { status: r.status(), text: await r.text(), kind: "status" };
+  }
+  const body = {
+    asan_empcode: empcode,
+    clock_type: "IN",
+    clock_time: "",
+    latitude: null,
+    longitude: null,
+    source: "WEB",
+  };
+  const r = await page.context().request.post(
+    ASANIFY_API + "/api/attendance/clock",
+    { headers, data: body }
   );
+  return { status: r.status(), text: await r.text(), kind: "clock" };
 }

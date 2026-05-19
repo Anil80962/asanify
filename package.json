@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "libsodium-wrappers": "^0.8.4"
   }
 }
