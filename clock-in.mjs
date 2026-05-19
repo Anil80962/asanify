@@ -24,6 +24,25 @@ import {
 const DRY_RUN = process.argv.includes("--dry-run");
 const log = (m) => console.log(`[${new Date().toISOString()}] ${m}`);
 
+// Today's date in IST (YYYY-MM-DD). GitHub Actions runners are UTC.
+const todayIST = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric", month: "2-digit", day: "2-digit",
+}).format(new Date());
+
+// Holiday check — skip all employees on listed dates.
+try {
+  const { holidays = [] } = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "holidays.json"), "utf8")
+  );
+  if (holidays.includes(todayIST)) {
+    log(`⏭ Holiday on ${todayIST} — skipping clock-in.`);
+    process.exit(0);
+  }
+} catch {
+  /* holidays.json missing or malformed — proceed normally */
+}
+
 const statePath = resolveStatePath();
 const empcode = getEmpcode();
 
@@ -84,6 +103,11 @@ try {
       /* fall through */
     }
     if (j.IS_VALID === false) {
+      const reason = (j.REASON || "").toUpperCase();
+      if (reason.includes("LEAVE") || reason.includes("HOLIDAY") || reason.includes("ABSENT")) {
+        log(`⏭ Skipped — Asanify says: "${j.REASON}". Employee is on leave/holiday today.`);
+        process.exit(0);
+      }
       log(`❌ Asanify rejected clock-in. REASON: ${j.REASON || "(none)"} | ${res.text.slice(0, 300)}`);
       process.exitCode = 1;
       throw new Error("IS_VALID false");
