@@ -24,24 +24,40 @@ import {
 const DRY_RUN = process.argv.includes("--dry-run");
 const log = (m) => console.log(`[${new Date().toISOString()}] ${m}`);
 
-// Today's date in IST (YYYY-MM-DD). GitHub Actions runners are UTC.
+// ── Working-day gate ────────────────────────────────────────────────────────
+// All checks use IST so the date is correct even on UTC GitHub runners.
+
+// IST date string "YYYY-MM-DD" and day-of-week (0=Sun … 6=Sat).
+const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 const todayIST = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
   year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
+const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const dayOfWeek = istNow.getDay(); // 0=Sun, 6=Sat
 
-// Holiday check — skip all employees on listed dates.
+// 1. Weekend check
+if (dayOfWeek === 0 || dayOfWeek === 6) {
+  log(`⏭ ${DAY_NAMES[dayOfWeek]} (${todayIST}) is a weekend — skipping clock-in.`);
+  process.exit(0);
+}
+
+// 2. Holiday check — dates listed in holidays.json are skipped for all employees.
 try {
   const { holidays = [] } = JSON.parse(
     fs.readFileSync(path.join(process.cwd(), "holidays.json"), "utf8")
   );
   if (holidays.includes(todayIST)) {
-    log(`⏭ Holiday on ${todayIST} — skipping clock-in.`);
+    log(`⏭ ${todayIST} is a listed holiday — skipping clock-in.`);
     process.exit(0);
   }
 } catch {
   /* holidays.json missing or malformed — proceed normally */
 }
+
+// 3. Employee leave: handled below — if Asanify returns IS_VALID=false with a
+//    leave/holiday reason, the script exits 0 (graceful skip, not a failure).
+// ────────────────────────────────────────────────────────────────────────────
 
 const statePath = resolveStatePath();
 const empcode = getEmpcode();
