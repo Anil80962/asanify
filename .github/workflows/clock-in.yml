@@ -32,11 +32,14 @@ jobs:
         run: |
           node -e '
             const r = require("./employees.json");
-            const inc = (r.employees||[]).map(id => {
-              const U = String(id).toUpperCase();
-              return { id, stateSecret: "ASANIFY_STATE_"+U, empSecret: "ASANIFY_EMPCODE_"+U };
-            });
-            if (!inc.length) { console.error("employees.json has no employees"); process.exit(1); }
+            const inc = (r.employees||[])
+              .filter(e => (typeof e === "string") || e.enabled !== false)
+              .map(e => {
+                const id = typeof e === "string" ? e : e.id;
+                const U = String(id).toUpperCase();
+                return { id, stateSecret: "ASANIFY_STATE_"+U, empSecret: "ASANIFY_EMPCODE_"+U };
+              });
+            if (!inc.length) { console.log("No active employees — nothing to do."); process.exit(0); }
             require("fs").appendFileSync(process.env.GITHUB_OUTPUT,
               "matrix=" + JSON.stringify({ include: inc }) + "\n");
           '

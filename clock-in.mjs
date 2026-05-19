@@ -47,8 +47,12 @@ try {
   const { holidays = [] } = JSON.parse(
     fs.readFileSync(path.join(process.cwd(), "holidays.json"), "utf8")
   );
-  if (holidays.includes(todayIST)) {
-    log(`⏭ ${todayIST} is a listed holiday — skipping clock-in.`);
+  // Support both flat string array and {date, label} object array
+  const holidayDates = holidays.map(h => typeof h === "string" ? h : h.date);
+  const match = holidays.find(h => (typeof h === "string" ? h : h.date) === todayIST);
+  if (holidayDates.includes(todayIST)) {
+    const label = match && typeof match === "object" ? match.label : todayIST;
+    log(`⏭ Holiday: ${label} (${todayIST}) — skipping clock-in.`);
     process.exit(0);
   }
 } catch {
