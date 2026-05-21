@@ -4,12 +4,6 @@
                           "name":  "Anil",
                           "id":  "anil",
                           "enabled":  true
-                      },
-                      {
-                          "empcode":  "EMPaf74331c8a0a4334b4223f9ef4a5274c",
-                          "name":  "Y Chaithanya Reddy",
-                          "id":  "chaithanya",
-                          "enabled":  true
                       }
                   ],
     "_comment":  "Roster only — NO secrets here. For each employee, add ASANIFY_STATE_\u003cID\u003e and ASANIFY_EMPCODE_\u003cID\u003e GitHub Secrets (id uppercased). Set enabled:false to pause clock-in without removing the employee."
