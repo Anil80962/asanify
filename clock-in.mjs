@@ -59,7 +59,22 @@ try {
   /* holidays.json missing or malformed — proceed normally */
 }
 
-// 3. Employee leave: handled below — if Asanify returns IS_VALID=false with a
+// 3. Time window guard — GitHub Actions scheduled jobs can lag significantly.
+//    If this is a scheduled run (not a manual dispatch) and the current IST
+//    time is past 10:45 AM, the run is too late to be useful; skip it so
+//    employees don't get a mid-afternoon clock-in.
+//    CLOCK_IN_CUTOFF_HOUR env var overrides the cutoff (default 10, i.e. 10:45).
+if (process.env.GITHUB_EVENT_NAME === "schedule") {
+  const cutoffHour = parseInt(process.env.CLOCK_IN_CUTOFF_HOUR || "10", 10);
+  const istHour = istNow.getHours();
+  const istMin  = istNow.getMinutes();
+  if (istHour > cutoffHour || (istHour === cutoffHour && istMin > 45)) {
+    log(`⏭ GitHub Actions ran late (${istHour}:${String(istMin).padStart(2,"0")} IST, scheduled for 10:00 IST). Skipping to avoid late attendance.`);
+    process.exit(0);
+  }
+}
+
+// 4. Employee leave: handled below — if Asanify returns IS_VALID=false with a
 //    leave/holiday reason, the script exits 0 (graceful skip, not a failure).
 // ────────────────────────────────────────────────────────────────────────────
 
