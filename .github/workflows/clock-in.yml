@@ -2,12 +2,10 @@ name: Asanify clock-in (multi-employee)
 
 on:
   schedule:
-    # GitHub cron is UTC. IST = UTC + 5:30. Convert your desired IST time:
-    #   09:00 IST -> "30 3 * * 1-5"
-    #   09:30 IST -> "0 4 * * 1-5"
-    #   10:00 IST -> "30 4 * * 1-5"  <-- current (10:00 IST)
-    # 1-5 = Mon-Fri. NOTE: GitHub-hosted cron can lag 5-15 min under load.
-    - cron: "30 4 * * 1-5"
+    # Primary trigger: Vercel cron calls workflow_dispatch at 10:00 IST exactly.
+    # This schedule is a fallback in case Vercel misses (fires 30 min later).
+    # GitHub cron UTC: 10:00 IST = 04:30 UTC  |  fallback 10:30 IST = 05:00 UTC
+    - cron: "0 5 * * 1-5"
   workflow_dispatch:
     inputs:
       dry_run:
