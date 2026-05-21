@@ -1,7 +1,21 @@
 {
   "_comment": "Roster only — NO secrets here. For each employee, add ASANIFY_STATE_<ID> and ASANIFY_EMPCODE_<ID> GitHub Secrets (id uppercased). Set enabled:false to pause clock-in without removing the employee.",
   "employees": [
-    { "id": "anil", "name": "Anil", "enabled": true },
-    { "id": "chaitanya", "name": "Chaitanya", "enabled": true }
+    {
+      "id": "anil",
+      "name": "Anil",
+      "enabled": true
+    },
+    {
+      "id": "chaitanya",
+      "name": "Chaitanya",
+      "enabled": true
+    },
+    {
+      "id": "Chaithanya",
+      "name": "Y Chaithanya Reddy",
+      "enabled": true,
+      "empcode": "FGSUS066"
+    }
   ]
 }
