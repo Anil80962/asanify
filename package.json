@@ -6,6 +6,7 @@
   "description": "Automated weekday Asanify clock-in via headless Google-SSO login + token intercept",
   "scripts": {
     "capture": "node capture-session.mjs",
+    "onboard": "node onboard.mjs",
     "clockin": "node clock-in.mjs",
     "dry": "node clock-in.mjs --dry-run"
   },

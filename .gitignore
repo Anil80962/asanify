@@ -5,3 +5,4 @@ auth/
 *.local
 .env
 node_modules/
+onboard.config.json
