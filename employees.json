@@ -1,6 +1,16 @@
 {
   "_comment": "Roster only - NO secrets here. ASANIFY_STATE_<ID> and ASANIFY_EMPCODE_<ID> required per employee.",
   "employees": [
-    { "id": "anil", "name": "Anil", "enabled": true }
+    {
+      "id": "anil",
+      "name": "Anil",
+      "enabled": true
+    },
+    {
+      "id": "chaithanya",
+      "name": "Y Chaithanya Reddy",
+      "enabled": true,
+      "empcode": "FGSUS066"
+    }
   ]
 }
