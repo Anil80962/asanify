@@ -13,10 +13,12 @@ import path from "node:path";
 import { chromium } from "playwright";
 import {
   ASANIFY_APP,
+  ASANIFY_API,
   contextOptions,
   launchOpts,
   resolveStatePath,
   waitForFreshToken,
+  waitForEmpcode,
   getEmpcode,
   callAttendance,
 } from "./lib.mjs";
@@ -101,7 +103,8 @@ async function dumpFailure(tag) {
 
 try {
   log(`Mode: ${DRY_RUN ? "DRY RUN (status only)" : "CLOCK-IN"}. Restoring session...`);
-  const tokenP = waitForFreshToken(context, 90_000);
+  const tokenP   = waitForFreshToken(context, 90_000);
+  const empcodeP = waitForEmpcode(context, 20_000); // intercept empcode from SPA traffic
   await page.goto(ASANIFY_APP, { waitUntil: "domcontentloaded" });
 
   // SSO may bounce through accounts.google.com and back. We don't drive it —
@@ -117,11 +120,36 @@ try {
     process.exitCode = 1;
     throw e;
   }
+
+  // Try to get empcode from the SPA's own API traffic — more reliable than the
+  // stored value. If the SPA's home page doesn't trigger an attendance call,
+  // navigate to the attendance section to force one.
+  let resolvedEmpcode = empcode;
+  try {
+    // Give SPA 3 s to make an attendance call on its own, then nudge it.
+    const nudge = setTimeout(async () => {
+      try { await page.goto(ASANIFY_API.replace("api.", "secure.") + "/attendance", { waitUntil: "domcontentloaded", timeout: 10_000 }); } catch { /* best effort */ }
+    }, 3000);
+    const detected = await empcodeP;
+    clearTimeout(nudge);
+    if (detected && detected !== resolvedEmpcode) {
+      log(`Empcode auto-detected from SPA: ${detected} (stored was: ${resolvedEmpcode}) — using detected value.`);
+      resolvedEmpcode = detected;
+    } else if (detected) {
+      log(`Empcode confirmed from SPA: ${detected}`);
+    } else {
+      log(`Empcode not intercepted from SPA, using stored value: ${resolvedEmpcode}`);
+    }
+  } catch {
+    log(`Empcode intercept timed out, using stored value: ${resolvedEmpcode}`);
+  }
+
   log(`Fresh token intercepted (${token.length} chars). Calling attendance API...`);
 
-  const res = await callAttendance(page, { token, authorization, empcode, dryRun: DRY_RUN });
+  const res = await callAttendance(page, { token, authorization, empcode: resolvedEmpcode, dryRun: DRY_RUN });
 
-  if (res.status !== 200) {
+  const ok = res.status === 200 || res.status === 204;
+  if (!ok) {
     await dumpFailure("api");
     log(`❌ ${res.kind} HTTP ${res.status}: ${res.text.slice(0, 400)}`);
     process.exitCode = 1;
